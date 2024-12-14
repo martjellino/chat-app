@@ -38,7 +38,7 @@ export default function Chat({ initialContacts }: ChatProps) {
 
         // Set up polling every 3 seconds
         // eslint-disable-next-line prefer-const
-        pollingInterval = setInterval(pollUpdates, 3000);
+        pollingInterval = setInterval(pollUpdates, 1000);
 
         return () => {
             if (pollingInterval) {
@@ -55,10 +55,10 @@ export default function Chat({ initialContacts }: ChatProps) {
     return (
         <div className="flex justify-center w-full min-h-screen bg-purple-200 p-4">
             <div className="flex w-full max-w-[1920px] h-[calc(100vh-2rem)] bg-yellow-50 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                <div className="w-[20%] min-w-[300px] border-r-4 border-black">
+                <div className="w-[30%] min-w-[300px] border-r-4 border-black">
                     <Sidebar />
                 </div>
-                <div className="w-[80%]">
+                <div className="w-[70%]">
                     {currentChat ? <ChatWindow /> : <WelcomeScreen />}
                 </div>
             </div>

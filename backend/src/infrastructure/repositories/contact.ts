@@ -1,3 +1,4 @@
+// src\infrastructure\repositories\contact.ts
 import "reflect-metadata";
 import { Contact, PrismaClient } from "@prisma/client";
 import { injectable } from "inversify";
@@ -45,11 +46,12 @@ export class ContactRepository implements IContact {
         });
     }
 
-    async create(userId: string, contactId: string): Promise<Contact> {
+    async create(userId: string, contactId: string, status: string = 'PENDING'): Promise<Contact> {
         return await this.prisma.contact.create({
             data: {
                 userId,
                 contactId,
+                status, // Now properly using the status parameter
             },
             include: {
                 contact: {

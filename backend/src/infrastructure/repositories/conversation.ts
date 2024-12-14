@@ -1,7 +1,8 @@
+// src/infrastructure/repositories/conversation.ts
 import "reflect-metadata";
 import { Conversation, PrismaClient, User } from "@prisma/client";
 import { injectable } from "inversify";
-import { IConversation } from "../interfaces/conversation";
+import { ConversationWithRelations, IConversation } from "../interfaces/conversation";
 import { prisma } from "../utils/prisma";
 
 @injectable()
@@ -11,14 +12,13 @@ export class ConversationRepository implements IConversation {
         this.prisma = prisma;
     }
 
-    async getAllByUser(userId: string): Promise<Conversation[]> {
+    async getAllByUser(userId: string): Promise<ConversationWithRelations[]> {
         try {
-            return await this.prisma.conversation.findMany({
+            const conversations = await this.prisma.conversation.findMany({
                 where: {
                     participants: {
                         some: {
                             userId: userId,
-                            leftAt: null,
                         },
                     },
                 },
@@ -37,12 +37,22 @@ export class ConversationRepository implements IConversation {
                         },
                     },
                     messages: {
-                        take: 1,
                         orderBy: {
                             createdAt: 'desc',
                         },
+                        where: {
+                            isDeleted: false
+                        },
+                        take: 1,
                     },
                 },
+            });
+
+            // Sort conversations based on their latest message or updatedAt
+            return conversations.sort((a, b) => {
+                const aTime = a.messages[0]?.createdAt || a.updatedAt;
+                const bTime = b.messages[0]?.createdAt || b.updatedAt;
+                return bTime.getTime() - aTime.getTime();
             });
         } catch (error) {
             throw new Error(`Failed to get conversations: ${error}`);

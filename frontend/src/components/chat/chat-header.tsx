@@ -84,19 +84,21 @@ export function ChatHeader() {
     };
 
     const handleClearChat = async () => {
-        try {
-            const response = await fetch(`http://localhost:7000/conversations/${currentChat.id}/messages`, {
-                method: 'DELETE',
-                credentials: 'include',
-            });
+        toast.info('The feature is still in progress. Please check back later.');
+        setIsConfirmClearOpen(false);
+        // try {
+        //     const response = await fetch(`http://localhost:7000/conversations/${currentChat.id}/messages`, {
+        //         method: 'DELETE',
+        //         credentials: 'include',
+        //     });
 
-            if (!response.ok) throw new Error('Failed to clear chat');
+        //     if (!response.ok) throw new Error('Failed to clear chat');
 
-            toast.success('Chat cleared successfully');
-            setIsConfirmClearOpen(false);
-        } catch (error) {
-            toast.error(getErrorMessage(error));
-        }
+        //     toast.success('Chat cleared successfully');
+        //     setIsConfirmClearOpen(false);
+        // } catch (error) {
+        //     toast.error(getErrorMessage(error));
+        // }
     };
 
     // Get contacts that aren't already in the group

@@ -1,7 +1,7 @@
 // components/chat/sidebar.tsx
 
 'use client'
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { Search, LogOut, UserPlus, Check, X, Users, MoreVertical } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useChat } from "@/context/chat-context";
@@ -25,6 +25,7 @@ import { getErrorMessage } from "@/lib/error";
 import ContactsModal from "./contact-modal";
 import { useRouter } from "next/navigation"; // Add this import
 import { CreateGroupDialog } from "./create-group-dialog";
+// import notifSound from "@/assets/notif"
 
 interface User {
     id: string;
@@ -41,11 +42,13 @@ interface Participant {
     role: string;
 }
 
-interface Message {
+export interface Message {
     id: string;
     content: string;
     senderId: string;
+    conversationId: string;
     createdAt: string;
+    updatedAt?: string;
 }
 
 interface Conversation {
@@ -56,6 +59,15 @@ interface Conversation {
     lastMessage?: Message;
     createdAt: string;
     updatedAt: string;
+}
+
+interface UnreadCount {
+    [conversationId: string]: number;
+}
+
+// Add this to your sidebar component
+interface MessageEvent extends CustomEvent {
+    detail: Message;
 }
 
 // type ContactStatus = 'PENDING' | 'ACCEPTED' | 'BLOCKED';
@@ -76,7 +88,21 @@ export default function Sidebar() {
     const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
     const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
     const [isCreateGroupDialogOpen, setIsCreateGroupDialogOpen] = useState(false);
+    const [unreadCounts, setUnreadCounts] = useState<UnreadCount>({});
+    const notificationSound = useRef<HTMLAudioElement | null>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        notificationSound.current = new Audio('/notif.mp3');
+    }, [])
+
+    const playNotificationSound = useCallback(() => {
+        if (notificationSound.current) {
+            notificationSound.current.play().catch(error => {
+                console.log('Audio playback failed:', error);
+            });
+        }
+    }, []);
 
     // Helper function to get chat display name
     const getChatName = (conversation: Conversation): string => {
@@ -96,6 +122,43 @@ export default function Sidebar() {
 
         return 'Unnamed Chat';
     };
+
+    const handleSelectChat = (conv: Conversation) => {
+        setCurrentChat(conv);
+        setUnreadCounts((prev) => ({
+            ...prev,
+            [conv.id]: 0
+        }));
+    };
+
+    useEffect(() => {
+        const handleNewMessage = (event: MessageEvent) => {
+            const message = event.detail;
+
+            // Only handle unread counts and notifications
+            if (
+                message.senderId !== user?.id &&
+                (!currentChat || currentChat.id !== message.conversationId) &&
+                !document.hasFocus()
+            ) {
+                setUnreadCounts(prev => ({
+                    ...prev,
+                    [message.conversationId]: (prev[message.conversationId] || 0) + 1
+                }));
+                playNotificationSound();
+            }
+
+            // No need to manually update conversations since polling will handle it
+        };
+
+        window.addEventListener('newMessage', handleNewMessage as EventListener);
+        return () => {
+            window.removeEventListener('newMessage', handleNewMessage as EventListener);
+        };
+    }, [currentChat, user?.id, playNotificationSound]);
+
+    const totalUnreadMessages = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+
     const handleAddContact = async () => {
         if (!newContactEmail.trim()) return;
 
@@ -167,60 +230,29 @@ export default function Sidebar() {
         }
     };
 
-    const filteredConversations = conversations
-        .filter(conv => {
+    const filteredConversations = useMemo(() => {
+        return conversations.filter(conv => {
             const chatName = getChatName(conv).toLowerCase();
             return chatName.includes(searchQuery.toLowerCase());
-        })
-        .sort((a, b) => {
-            if (a.lastMessage && b.lastMessage) {
-                return new Date(b.lastMessage.createdAt).getTime() -
-                    new Date(a.lastMessage.createdAt).getTime();
-            }
-            return new Date(b.updatedAt).getTime() -
-                new Date(a.updatedAt).getTime();
         });
+    }, [conversations, searchQuery, getChatName]);
 
     // Separate contacts by status
     const pendingContacts = contacts.filter(contact =>
         contact.status === 'PENDING' &&
-        contact.userId === localUser?.id // Only show requests where the current user is the receiver
+        contact.userId === localUser?.id  // We are the receiver who needs to approve
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const acceptedContacts = contacts.filter(contact => contact.status === 'ACCEPTED');
-
-    useEffect(() => {
-        // This will run whenever conversations array changes
-        const sortedConversations = [...conversations].sort((a, b) => {
-            // If there are last messages, sort by last message time
-            if (a.lastMessage && b.lastMessage) {
-                return new Date(b.lastMessage.createdAt).getTime() -
-                    new Date(a.lastMessage.createdAt).getTime();
-            }
-            // If no last messages, sort by conversation creation/update time
-            return new Date(b.updatedAt).getTime() -
-                new Date(a.updatedAt).getTime();
-        });
-
-        // Update current chat if needed (to maintain selection after sorting)
-        if (currentChat) {
-            const updatedCurrentChat = sortedConversations.find(conv => conv.id === currentChat.id);
-            if (updatedCurrentChat) {
-                setCurrentChat(updatedCurrentChat);
-            }
-        }
-    }, [conversations]); // Dependency array includes conversations to react to changes
 
     const handleLogout = useCallback(async () => {
         try {
             // Call auth context logout first
             await logout();
-            
+
             // Clear client state
             setCurrentChat(null);
             setSearchQuery("");
             setLocalUser(null);
-    
+
             // Navigate to login page
             router.replace('/login');
         } catch (error) {
@@ -345,6 +377,11 @@ export default function Sidebar() {
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
+                {totalUnreadMessages > 0 && (
+                    <div className="bg-red-500 text-white font-bold px-2 py-1 rounded-full border-2 border-black text-xs">
+                        {totalUnreadMessages}
+                    </div>
+                )}
             </div>
 
             {/* Search bar */}
@@ -401,9 +438,9 @@ export default function Sidebar() {
                 {filteredConversations.map((conv) => (
                     <div
                         key={conv.id}
-                        onClick={() => setCurrentChat(conv)}
-                        className={`flex items-center p-3 cursor-pointer border-b-2 border-black hover:bg-blue-100 transition-colors
-                            ${currentChat?.id === conv.id ? "bg-blue-100" : ""}`}
+                        onClick={() => handleSelectChat(conv)}
+                        className={`flex items-center p-3 cursor-pointer border-b-2 border-black hover:bg-blue-100 transition-colors relative
+                    ${currentChat?.id === conv.id ? "bg-blue-100" : ""}`}
                     >
                         <div className="w-12 h-12 rounded-md bg-purple-400 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex-shrink-0 flex items-center justify-center text-white font-bold">
                             {getChatName(conv).charAt(0).toUpperCase()}
@@ -411,14 +448,21 @@ export default function Sidebar() {
                         <div className="ml-3 flex-1 min-w-0">
                             <div className="flex justify-between items-baseline">
                                 <h3 className="font-bold truncate">{getChatName(conv)}</h3>
-                                {conv.lastMessage && (
-                                    <span className="text-xs font-medium bg-gray-200 px-2 py-1 rounded-md border border-black">
-                                        {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </span>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {unreadCounts[conv.id] > 0 && (
+                                        <span className="bg-red-500 text-white font-bold px-2 py-1 rounded-full border-2 border-black text-xs">
+                                            {unreadCounts[conv.id]}
+                                        </span>
+                                    )}
+                                    {conv.lastMessage && (
+                                        <span className="text-xs font-medium bg-gray-200 px-2 py-1 rounded-md border border-black">
+                                            {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             {conv.lastMessage && (
                                 <p className="text-sm text-gray-600 truncate">

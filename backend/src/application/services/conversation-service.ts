@@ -1,9 +1,11 @@
+// src\application\services\conversation-service.ts
 import "reflect-metadata";
 import { inject, injectable } from "inversify";
 import { ConversationRepository } from "../../infrastructure/repositories/conversation";
 import { ParticipantRepository } from "../../infrastructure/repositories/participant";
 import { TYPES } from "../../infrastructure/types";
-import { Conversation, Participant, PrismaClient } from "@prisma/client";
+import { Conversation, Participant, Message } from "@prisma/client";
+
 
 type ConversationType = 'DIRECT' | 'GROUP';
 
@@ -23,6 +25,19 @@ type ConversationWithParticipants = Conversation & {
     })[];
 };
 
+type ConversationWithRelations = Conversation & {
+    messages: Message[];
+    participants: (Participant & {
+        user: {
+            id: string;
+            name: string;
+            email: string;
+            avatar: string | null;
+            status: string;
+        }
+    })[];
+}
+
 @injectable()
 export class ConversationService {
     private conversationRepo: ConversationRepository;
@@ -37,7 +52,11 @@ export class ConversationService {
     }
 
     public async getAllUserConversations(userId: string) {
-        return await this.conversationRepo.getAllByUser(userId);
+        const conversations = await this.conversationRepo.getAllByUser(userId);
+        return conversations.map((conv: ConversationWithRelations) => ({
+            ...conv,
+            lastMessage: conv.messages[0] || null
+        }));
     }
 
     public async getConversationById(id: string, userId: string) {

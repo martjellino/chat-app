@@ -2,7 +2,7 @@
 "use client";
 
 import { ApiError, getErrorMessage } from "@/lib/error";
-import { createContext, useContext, useState, useOptimistic, useCallback, startTransition } from "react";
+import { createContext, useContext, useState, useOptimistic, useCallback, startTransition, useEffect } from "react";
 import { useAuth } from "./auth-context";
 
 interface User {
@@ -54,12 +54,13 @@ interface ChatContextType {
     contacts: ContactWithUser[];  // Update this type
     setContacts: (contacts: ContactWithUser[]) => void;
     setCurrentChat: (chat: Conversation | null) => void;
+    setConversations: (conversations: Conversation[]) => void; // Add this
     fetchContacts: () => Promise<void>;
     fetchConversations: () => Promise<void>;
     fetchMessages: (conversationId: string) => Promise<void>;
     addContact: (email: string) => Promise<void>;
     createDirectChat: (userId: string) => Promise<void>;
-    createGroupChat: (name: string, participantIds: string[]) => Promise<void>; 
+    createGroupChat: (name: string, participantIds: string[]) => Promise<void>;
     sendMessage: (conversationId: string, content: string) => Promise<void>;
 }
 
@@ -87,47 +88,23 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         },
     ]);
 
-    const sendMessage = useCallback(async (conversationId: string, content: string) => {
-        if (!user) throw new Error('User not authenticated');
+    const reorderConversations = useCallback((conversationId: string, lastMessage: Message) => {
+        setConversations(prev => {
+            // Find and update the conversation with new message
+            const updatedConversations = prev.map(conv =>
+                conv.id === conversationId
+                    ? { ...conv, lastMessage, updatedAt: lastMessage.createdAt }
+                    : conv
+            );
 
-        try {
-            // Wrap optimistic update in startTransition
-            startTransition(() => {
-                addOptimisticMessage({ content, conversationId });
+            // Sort conversations by latest message/update time
+            return updatedConversations.sort((a, b) => {
+                const timeA = a.lastMessage?.createdAt || a.updatedAt;
+                const timeB = b.lastMessage?.createdAt || b.updatedAt;
+                return new Date(timeB).getTime() - new Date(timeA).getTime();
             });
-
-            const response = await fetch(`http://localhost:7000/conversations/${conversationId}/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ content }),
-            });
-
-            if (!response.ok) throw new Error('Failed to send message');
-            const newMessage = await response.json();
-
-            // Wrap state update in startTransition
-            startTransition(() => {
-                setMessages(prev => {
-                    // Get all messages except temp ones from current conversation
-                    const filteredMessages = prev.filter(msg =>
-                        !msg.id.startsWith('temp-') || msg.conversationId !== conversationId
-                    );
-                    return [...filteredMessages, newMessage];
-                });
-            });
-        } catch (error) {
-            // Wrap error state update in startTransition
-            startTransition(() => {
-                setMessages(prev =>
-                    prev.filter(msg =>
-                        !msg.id.startsWith('temp-') || msg.conversationId !== conversationId
-                    )
-                );
-            });
-            throw error;
-        }
-    }, [user, addOptimisticMessage]);
+        });
+    }, []);
 
     const handleApiResponse = async (response: Response) => {
         if (!response.ok) {
@@ -172,12 +149,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 credentials: 'include',
             });
             const data = await handleApiResponse(response);
-
-            // Compare before updating
-            setConversations(prev => {
-                const areConversationsEqual = JSON.stringify(prev) === JSON.stringify(data);
-                return areConversationsEqual ? prev : data;
+    
+            // Sort conversations before setting state
+            const sortedData = data.sort((a: Conversation, b: Conversation) => {
+                const timeA = a.lastMessage?.createdAt || a.updatedAt;
+                const timeB = b.lastMessage?.createdAt || b.updatedAt;
+                return new Date(timeB).getTime() - new Date(timeA).getTime();
             });
+    
+            setConversations(sortedData);
         } catch (error: unknown) {
             throw new ApiError(getErrorMessage(error));
         }
@@ -190,32 +170,37 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
             const data = await handleApiResponse(response);
 
-            setMessages(prevMessages => {
-                const areMessagesEqual = JSON.stringify(prevMessages) === JSON.stringify(data);
-                return areMessagesEqual ? prevMessages : data;
-            });
-        } catch (error: unknown) {
+            setMessages(data);
+
+            // If there are messages, update conversation order
+            if (data.length > 0) {
+                const lastMessage = data[data.length - 1];
+                reorderConversations(conversationId, lastMessage);
+            }
+        } catch (error) {
             throw new ApiError(getErrorMessage(error));
         }
-    }, []); // Empty dependency array since this function doesn't depend on any external values
+    }, [reorderConversations]);
+
+
 
     const addContact = async (email: string) => {
         try {
             const response = await fetch('http://localhost:7000/contacts', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
                 credentials: 'include',
                 body: JSON.stringify({ email }),
             });
-    
+
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Failed to add contact');
             }
-    
+
             await fetchContacts(); // Refresh contacts list
         } catch (error: unknown) {
             throw new ApiError(getErrorMessage(error));
@@ -264,7 +249,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
 
             const newChat = await handleApiResponse(response);
-            
+
             // Update conversations and set current chat
             setConversations(prev => [...prev, newChat]);
             setCurrentChat(newChat);
@@ -272,6 +257,66 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             throw new ApiError(getErrorMessage(error));
         }
     };
+
+    const sendMessage = useCallback(async (conversationId: string, content: string) => {
+        if (!user) throw new Error('User not authenticated');
+        const tempId = `temp-${Date.now()}`;
+        const tempMessage = {
+            id: tempId,
+            content,
+            senderId: user.id,
+            conversationId,
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            // Optimistic update
+            startTransition(() => {
+                addOptimisticMessage({ content, conversationId });
+                reorderConversations(conversationId, tempMessage);
+            });
+
+            const response = await fetch(`http://localhost:7000/conversations/${conversationId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ content }),
+            });
+
+            if (!response.ok) throw new Error('Failed to send message');
+            const newMessage = await response.json();
+
+            // Update with real message and reorder conversations
+            startTransition(() => {
+                setMessages(prev => prev.filter(msg => msg.id !== tempId).concat(newMessage));
+                reorderConversations(conversationId, newMessage);
+            });
+
+            // Dispatch new message event
+            const messageEvent = new CustomEvent('newMessage', { detail: newMessage });
+            window.dispatchEvent(messageEvent);
+
+        } catch (error) {
+            // Revert optimistic updates
+            startTransition(() => {
+                setMessages(prev => prev.filter(msg => msg.id !== tempId));
+                fetchConversations();
+            });
+            throw error;
+        }
+    }, [user, addOptimisticMessage, reorderConversations, fetchConversations]);
+
+    useEffect(() => {
+        const handleNewMessage = (event: CustomEvent<Message>) => {
+            const message = event.detail;
+            reorderConversations(message.conversationId, message);
+        };
+
+        window.addEventListener('newMessage', handleNewMessage as EventListener);
+        return () => {
+            window.removeEventListener('newMessage', handleNewMessage as EventListener);
+        };
+    }, [reorderConversations]);
 
     return (
         <ChatContext.Provider value={{
@@ -281,6 +326,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             contacts,
             setContacts: setContactsSafely,
             setCurrentChat,
+            setConversations,
             fetchContacts,
             fetchConversations,
             fetchMessages,

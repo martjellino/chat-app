@@ -18,7 +18,9 @@ export interface Message {
     id: string;
     content: string;
     senderId: string;
+    conversationId: string;
     createdAt: string;
+    updatedAt?: string;
 }
 
 export interface Conversation {
@@ -37,6 +39,10 @@ export interface Contact {
     contactId: string;
     status: 'PENDING' | 'ACCEPTED' | 'BLOCKED';
     contact: User;
+}
+
+export interface MessageEvent extends CustomEvent {
+    detail: Message;
 }
 
 export type ContactStatus = 'PENDING' | 'ACCEPTED' | 'BLOCKED';

@@ -1,3 +1,4 @@
+// src\application\services\contact-service.ts
 import "reflect-metadata";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../infrastructure/types";
@@ -29,8 +30,8 @@ export class ContactService {
     }
 
     // Create bidirectional contact relationship
-    const contact = await this.contactRepo.create(userId, contactId);
-    await this.contactRepo.create(contactId, userId);
+    const contact = await this.contactRepo.create(contactId, userId);
+    // await this.contactRepo.create(contactId, userId);
 
     return contact;
   }
@@ -47,56 +48,76 @@ export class ContactService {
       throw new Error("Cannot add yourself as a contact");
     }
 
-    // Check if contact already exists
+    // Check if contact already exists in either direction
     const existingContact = await this.contactRepo.getContact(userId, contactUser.id);
-    if (existingContact) {
-      throw new Error("Contact already exists");
+    const existingReverseContact = await this.contactRepo.getContact(contactUser.id, userId);
+
+    if (existingContact || existingReverseContact) {
+      throw new Error("Contact relationship already exists");
     }
 
-    // Create bidirectional contact relationship
-    const contact = await this.contactRepo.create(userId, contactUser.id);
-    await this.contactRepo.create(contactUser.id, userId);
+    // Create initial contact request - sender to receiver
+    const contact = await this.contactRepo.create( contactUser.id, userId, 'PENDING');
+
+    // Create reverse contact relationship as PENDING
+    await this.contactRepo.create(userId, contactUser.id, 'RECEIVED');
 
     return contact;
   }
 
   public async updateContactStatus(userId: string, contactId: string, status: string) {
-    // Find the current contact relationship
+    // Find the contact that's being updated
     const contact = await this.contactRepo.getByID(contactId);
-    if (!contact) {
-        throw new Error("Contact not found");
-    }
-
-    // Verify this contact belongs to the current user
-    if (contact.userId !== userId) {
-        throw new Error("Unauthorized to update this contact");
-    }
-
-    // Update the current contact's status
-    const updatedContact = await this.contactRepo.updateStatus(contactId, status);
-
-    // If the status is being set to ACCEPTED, update the reverse relationship too
-    if (status === 'ACCEPTED') {
-        // Find the reverse contact relationship
-        const reverseContact = await this.contactRepo.getContact(contact.contactId, contact.userId);
-        if (reverseContact) {
-            // Update the reverse contact's status
-            await this.contactRepo.updateStatus(reverseContact.id, status);
-        }
-    }
-
-    return updatedContact;
-}
-
-  public async removeContact(userId: string, contactId: string) {
-    const contact = await this.contactRepo.getContact(userId, contactId);
     if (!contact) {
       throw new Error("Contact not found");
     }
 
-    // Remove bidirectional contact relationship
-    await this.contactRepo.delete(contact.id);
+    // Verify this contact belongs to the current user
+    if (contact.userId !== userId) {
+      throw new Error("Unauthorized to update this contact");
+    }
+
+    if (status === 'ACCEPTED') {
+      // Find or create the reverse contact relationship
+      const reverseContact = await this.contactRepo.getContact(contact.contactId, contact.userId);
+
+      if (!reverseContact) {
+        // Create reverse contact if it doesn't exist
+        await this.contactRepo.create(contact.contactId, contact.userId, 'ACCEPTED');
+      } else {
+        // Update reverse contact status
+        await this.contactRepo.updateStatus(reverseContact.id, 'ACCEPTED');
+      }
+
+      // Update the original contact status
+      const updatedContact = await this.contactRepo.updateStatus(contactId, 'ACCEPTED');
+      return updatedContact;
+    } else if (status === 'REJECTED') {
+      // If rejecting, remove both contact relationships
+      const reverseContact = await this.contactRepo.getContact(contact.contactId, contact.userId);
+      if (reverseContact) {
+        await this.contactRepo.delete(reverseContact.id);
+      }
+      await this.contactRepo.delete(contactId);
+      return null;
+    } else {
+      // For other status updates, just update the current contact
+      return await this.contactRepo.updateStatus(contactId, status);
+    }
+  }
+
+  public async removeContact(userId: string, contactId: string) {
+    const contact = await this.contactRepo.getContact(userId, contactId);
     const reverseContact = await this.contactRepo.getContact(contactId, userId);
+
+    if (!contact && !reverseContact) {
+      throw new Error("Contact relationship not found");
+    }
+
+     // Remove both directions if they exist
+     if (contact) {
+      await this.contactRepo.delete(contact.id);
+    }
     if (reverseContact) {
       await this.contactRepo.delete(reverseContact.id);
     }
