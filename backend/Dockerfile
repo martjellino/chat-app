@@ -7,6 +7,8 @@ WORKDIR /app
 # Copy package files first
 COPY package.json bun.lockb ./
 
+COPY prisma .
+
 # Install dependencies
 RUN bun install --ignore-scripts
 
