@@ -8,7 +8,10 @@ import { contactRouter } from "./presentation/router/contact-router";
 
 
 const app = new Elysia()
-  .use(cors())
+  .use(cors({
+    origin: ['http://103.49.239.57:3000', 'http://localhost:3000'],
+    credentials: true
+  }))
   .use(swagger({
     documentation: {
       info: {
@@ -28,6 +31,9 @@ const app = new Elysia()
   .use(conversationRouter)
   .use(messageRouter)
   .use(contactRouter)
-  .listen(7000);
+  .listen({
+    hostname: '0.0.0.0',  // Important: Listen on all interfaces
+    port: 7000
+  });
 
 console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);

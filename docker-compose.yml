@@ -12,7 +12,7 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - BACKEND_URL=http://backend:7000
+      - NEXT_PUBLIC_API_URL=http://backend:7000
     depends_on:
       - backend
 
@@ -25,10 +25,10 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - sqlite_data:/app/prisma/data  # Mount point for SQLite database
+      - sqlite_data:/app/prisma/data
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=file:/app/prisma/data/dev.db  # SQLite connection string
+      - DATABASE_URL=file:/app/prisma/data/dev.db
 
 volumes:
   sqlite_data:
