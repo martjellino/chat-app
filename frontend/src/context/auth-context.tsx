@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     return null;
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, ] = useState(true);
 
   const login = async (email: string, password: string) => {
     try {
@@ -79,35 +79,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Initialize user data from localStorage and verify session
-  useEffect(() => {
-    const verifySession = async () => {
-      try {
-        // Try to get saved user data first
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-        }
+  // useEffect(() => {
+  //   const verifySession = async () => {
+  //     try {
+  //       // Try to get saved user data first
+  //       const savedUser = localStorage.getItem('user');
+  //       if (savedUser) {
+  //         setUser(JSON.parse(savedUser));
+  //       }
 
-        // Verify session with server
-        const response = await fetch(`${API_URL}/contacts`, {
-          credentials: 'include'
-        });
+  //       // Verify session with server
+  //       const response = await fetch(`${API_URL}/contacts`, {
+  //         credentials: 'include'
+  //       });
 
-        if (!response.ok) {
-          setUser(null);
-          localStorage.removeItem('user');
-        }
-      } catch (error) {
-        console.error('Session verification failed:', error);
-        setUser(null);
-        localStorage.removeItem('user');
-      } finally {
-        setLoading(false);
-      }
-    };
+  //       if (!response.ok) {
+  //         setUser(null);
+  //         localStorage.removeItem('user');
+  //       }
+  //     } catch (error) {
+  //       console.error('Session verification failed:', error);
+  //       setUser(null);
+  //       localStorage.removeItem('user');
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-    verifySession();
-  }, []);
+  //   verifySession();
+  // }, []);
 
   // Sync user state with localStorage
   useEffect(() => {
