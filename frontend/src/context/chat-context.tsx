@@ -2,7 +2,7 @@
 "use client";
 
 import { ApiError, getErrorMessage } from "@/lib/error";
-import { createContext, useContext, useState, useOptimistic, useCallback, startTransition, useEffect } from "react";
+import { createContext, useContext, useState, useOptimistic, useCallback, startTransition } from "react";
 import { useAuth } from "./auth-context";
 
 interface User {
@@ -74,6 +74,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [contacts, setContacts] = useState<ContactWithUser[]>([]);
 
     // Optimistic update for messages
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [optimisticMessages, addOptimisticMessage] = useOptimistic<
         Message[],
         { content: string; conversationId: string }
@@ -150,14 +151,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
             const data = await handleApiResponse(response);
     
-            // Sort conversations before setting state
-            const sortedData = data.sort((a: Conversation, b: Conversation) => {
+            // Sort conversations by latest message or updatedAt
+            const sortedData = [...data].sort((a, b) => {
                 const timeA = a.lastMessage?.createdAt || a.updatedAt;
                 const timeB = b.lastMessage?.createdAt || b.updatedAt;
                 return new Date(timeB).getTime() - new Date(timeA).getTime();
             });
     
-            setConversations(sortedData);
+            // Only update if there are actual changes
+            setConversations(prev => {
+                const prevJson = JSON.stringify(prev);
+                const newJson = JSON.stringify(sortedData);
+                return prevJson === newJson ? prev : sortedData;
+            });
         } catch (error: unknown) {
             throw new ApiError(getErrorMessage(error));
         }
@@ -268,7 +274,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             conversationId,
             createdAt: new Date().toISOString()
         };
-
+    
         try {
             // Optimistic update
             startTransition(() => {
@@ -276,47 +282,60 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 reorderConversations(conversationId, tempMessage);
             });
 
+    
+            setConversations(prev => {
+                const updated = prev.map(conv => 
+                    conv.id === conversationId 
+                        ? { ...conv, lastMessage: tempMessage, updatedAt: tempMessage.createdAt }
+                        : conv
+                ).sort((a, b) => {
+                    const timeA = a.lastMessage?.createdAt || a.updatedAt;
+                    const timeB = b.lastMessage?.createdAt || b.updatedAt;
+                    return new Date(timeB).getTime() - new Date(timeA).getTime();
+                });
+                return updated;
+            });
+    
+            // Send actual message
             const response = await fetch(`http://localhost:7000/conversations/${conversationId}/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ content }),
             });
-
+    
             if (!response.ok) throw new Error('Failed to send message');
             const newMessage = await response.json();
-
-            // Update with real message and reorder conversations
-            startTransition(() => {
-                setMessages(prev => prev.filter(msg => msg.id !== tempId).concat(newMessage));
-                reorderConversations(conversationId, newMessage);
+    
+            // Update with real message
+            setMessages(prev => 
+                prev.map(msg => msg.id === tempId ? newMessage : msg)
+            );
+    
+            // Update conversations with real message
+            setConversations(prev => {
+                const updated = prev.map(conv => 
+                    conv.id === conversationId 
+                        ? { ...conv, lastMessage: newMessage, updatedAt: newMessage.createdAt }
+                        : conv
+                ).sort((a, b) => {
+                    const timeA = a.lastMessage?.createdAt || a.updatedAt;
+                    const timeB = b.lastMessage?.createdAt || b.updatedAt;
+                    return new Date(timeB).getTime() - new Date(timeA).getTime();
+                });
+                return updated;
             });
-
-            // Dispatch new message event
+    
             const messageEvent = new CustomEvent('newMessage', { detail: newMessage });
             window.dispatchEvent(messageEvent);
-
+    
         } catch (error) {
             // Revert optimistic updates
-            startTransition(() => {
-                setMessages(prev => prev.filter(msg => msg.id !== tempId));
-                fetchConversations();
-            });
+            setMessages(prev => prev.filter(msg => msg.id !== tempId));
+            await fetchConversations(); // Refresh conversations on error
             throw error;
         }
-    }, [user, addOptimisticMessage, reorderConversations, fetchConversations]);
-
-    useEffect(() => {
-        const handleNewMessage = (event: CustomEvent<Message>) => {
-            const message = event.detail;
-            reorderConversations(message.conversationId, message);
-        };
-
-        window.addEventListener('newMessage', handleNewMessage as EventListener);
-        return () => {
-            window.removeEventListener('newMessage', handleNewMessage as EventListener);
-        };
-    }, [reorderConversations]);
+    }, [user, addOptimisticMessage, fetchConversations]);
 
     return (
         <ChatContext.Provider value={{

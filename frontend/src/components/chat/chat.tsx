@@ -10,7 +10,7 @@ import { ChatProps } from "@/types/chat";
 
 
 export default function Chat({ initialContacts }: ChatProps) {
-    const { setContacts, fetchContacts, fetchConversations } = useChat();
+    const { setContacts, fetchContacts, fetchConversations, setCurrentChat } = useChat();
     const initializeChat = useCallback(async () => {
         try {
             setContacts(initialContacts);
@@ -33,10 +33,9 @@ export default function Chat({ initialContacts }: ChatProps) {
             }
         };
 
-        // Initial load
         initializeChat();
-
-        // Set up polling every 3 seconds
+        
+        // Poll less frequently to avoid interference
         // eslint-disable-next-line prefer-const
         pollingInterval = setInterval(pollUpdates, 1000);
 
@@ -44,9 +43,9 @@ export default function Chat({ initialContacts }: ChatProps) {
             if (pollingInterval) {
                 clearInterval(pollingInterval);
             }
+            setCurrentChat(null); // Cleanup current chat on unmount
         };
-    }, [initializeChat, fetchContacts, fetchConversations]);
-
+    }, [initializeChat, fetchContacts, fetchConversations, setCurrentChat]);
     
 
 

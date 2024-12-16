@@ -23,6 +23,13 @@ export default function ChatWindow() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, []);
 
+    // Fetch messages when chat is selected
+    useEffect(() => {
+        if (currentChat?.id) {
+            fetchMessages(currentChat.id);
+        }
+    }, [currentChat?.id, fetchMessages]);
+
     // Group messages by date
     const groupedMessages = React.useMemo(() => {
         if (!messages) return [];
@@ -41,34 +48,10 @@ export default function ChatWindow() {
         return Object.entries(groups);
     }, [messages]);
 
-    useEffect(() => {
-        let pollingInterval: NodeJS.Timeout;
-
-        const fetchAndUpdateMessages = async () => {
-            if (currentChat?.id) {
-                try {
-                    await fetchMessages(currentChat.id);
-                } catch (error) {
-                    console.error('Error fetching messages:', error);
-                }
-            }
-        };
-
-        if (currentChat?.id) {
-            fetchAndUpdateMessages();
-            pollingInterval = setInterval(fetchAndUpdateMessages, 3000);
-        }
-
-        return () => {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
-        };
-    }, [currentChat?.id, fetchMessages]);
-
+    // Scroll to bottom when new messages arrive
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, scrollToBottom]);
 
     const handleSend = async () => {
         if (!message.trim() || sending || !currentChat) return;
@@ -79,6 +62,9 @@ export default function ChatWindow() {
 
         try {
             await sendMessage(currentChat.id, messageContent);
+            // After sending, fetch messages to ensure everything is in sync
+            await fetchMessages(currentChat.id);
+            scrollToBottom();
         } catch (error) {
             toast.error(getErrorMessage(error));
             setMessage(messageContent);
@@ -130,13 +116,6 @@ export default function ChatWindow() {
                         )}
                     </div>
                 </div>
-                {/* {isOwnMessage && (
-                    <div className="w-8 h-8 rounded-md bg-blue-400 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex-shrink-0 flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">
-                            {user?.name.charAt(0).toUpperCase()}
-                        </span>
-                    </div>
-                )} */}
             </div>
         );
     };
