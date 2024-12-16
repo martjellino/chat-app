@@ -32,8 +32,8 @@ const app = new Elysia()
   .use(messageRouter)
   .use(contactRouter)
   .listen({
-    hostname: '0.0.0.0',  // Important: Listen on all interfaces
+    hostname: '0.0.0.0',
     port: 7000
-  });
+  })
 
-console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);
+console.log(`🦊 Server is running on http://0.0.0.0:7000`)
