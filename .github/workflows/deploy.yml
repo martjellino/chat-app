@@ -10,23 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout the code
-      uses: actions/checkout@v2
+      - name: Checkout the code
+        uses: actions/checkout@v2
 
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.5.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.5.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Deploy to server
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << EOF
-          cd app
-          git pull
-          sudo docker compose build --no-cache
-          sudo docker compose down
-          sudo docker compose up -d
-        EOF
-
-        
-
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=60 \
+              -o ServerAliveCountMax=60 \
+              ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} '
+            cd app
+            git pull
+            sudo docker compose build --no-cache
+            sudo docker compose down
+            sudo docker compose up -d
+          EOF
