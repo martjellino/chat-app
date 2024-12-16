@@ -66,6 +66,8 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | null>(null);
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -123,7 +125,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const fetchContacts = useCallback(async () => {
         try {
-            const response = await fetch('http://localhost:7000/contacts', {
+            const response = await fetch(`${API_URL}/contacts`, {
                 credentials: 'include',
                 headers: {
                     'Accept': 'application/json',
@@ -146,7 +148,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const fetchConversations = useCallback(async () => {
         try {
-            const response = await fetch('http://localhost:7000/conversations', {
+            const response = await fetch(`${API_URL}/conversations`, {
                 credentials: 'include',
             });
             const data = await handleApiResponse(response);
@@ -171,7 +173,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const fetchMessages = useCallback(async (conversationId: string) => {
         try {
-            const response = await fetch(`http://localhost:7000/conversations/${conversationId}/messages`, {
+            const response = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
                 credentials: 'include',
             });
             const data = await handleApiResponse(response);
@@ -192,7 +194,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const addContact = async (email: string) => {
         try {
-            const response = await fetch('http://localhost:7000/contacts', {
+            const response = await fetch(`${API_URL}/contacts`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -215,7 +217,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const createDirectChat = async (userId: string) => {
         try {
-            const response = await fetch('http://localhost:7000/conversations', {
+            const response = await fetch(`${API_URL}/conversations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -241,7 +243,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const createGroupChat = async (name: string, participantIds: string[]) => {
         try {
-            const response = await fetch('http://localhost:7000/conversations', {
+            const response = await fetch(`${API_URL}/conversations`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -297,7 +299,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
     
             // Send actual message
-            const response = await fetch(`http://localhost:7000/conversations/${conversationId}/messages`, {
+            const response = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

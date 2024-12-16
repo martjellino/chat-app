@@ -3,10 +3,11 @@ import React from 'react'
 import { cookies } from 'next/headers';
 
 async function getContacts() {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('session');
-    const response = await fetch('http://localhost:7000/contacts', {
+    const response = await fetch(`${API_URL}/contacts`, {
       headers: {
         Cookie: `session=${sessionCookie?.value || ''}`,
       },

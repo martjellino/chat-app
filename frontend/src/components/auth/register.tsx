@@ -8,6 +8,8 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export const Register = () => {
     const router = useRouter();
     const [formData, setFormData] = useState({
@@ -24,7 +26,7 @@ export const Register = () => {
         setLoading(true);
 
         try {
-            const response = await fetch("http://localhost:7000/register", {
+            const response = await fetch(`${API_URL}/register`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

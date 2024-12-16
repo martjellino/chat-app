@@ -17,9 +17,12 @@ interface LoginState {
   user: any | null;  // Replace 'any' with your User type if available
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+
 async function loginAction(_prevState: LoginState | null, formData: FormData): Promise<LoginState> {
   try {
-    const response = await fetch('http://localhost:7000/login', {
+    const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -71,6 +71,7 @@ interface MessageEvent extends CustomEvent {
 }
 
 // type ContactStatus = 'PENDING' | 'ACCEPTED' | 'BLOCKED';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Sidebar() {
     const { user, logout } = useAuth();
@@ -199,7 +200,7 @@ export default function Sidebar() {
             console.log('Contact to update:', contactToUpdate);
 
             // Use contact.id for the relationship ID, not the user's ID
-            const response = await fetch(`http://localhost:7000/contacts/${contactId}`, {
+            const response = await fetch(`${API_URL}/contacts/${contactId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

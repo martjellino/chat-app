@@ -21,6 +21,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
@@ -33,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('http://localhost:7000/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:7000/logout', { // Fixed URL
+      const response = await fetch(`${API_URL}/logout`, { 
         method: 'POST',
         credentials: 'include',
       });
@@ -87,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Verify session with server
-        const response = await fetch('http://localhost:7000/contacts', {
+        const response = await fetch(`${API_URL}/contacts`, {
           credentials: 'include'
         });
 

@@ -21,6 +21,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/error";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export function ChatHeader() {
     const { user } = useAuth();
@@ -50,7 +51,7 @@ export function ChatHeader() {
 
     const handleAddParticipants = async () => {
         try {
-            const response = await fetch(`http://localhost:7000/conversations/${currentChat.id}/participants`, {
+            const response = await fetch(`${API_URL}/conversations/${currentChat.id}/participants`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -69,7 +70,7 @@ export function ChatHeader() {
 
     const handleLeaveGroup = async () => {
         try {
-            const response = await fetch(`http://localhost:7000/conversations/${currentChat.id}/leave`, {
+            const response = await fetch(`${API_URL}//conversations/${currentChat.id}/leave`, {
                 method: 'POST',
                 credentials: 'include',
             });
@@ -87,7 +88,7 @@ export function ChatHeader() {
         toast.info('The feature is still in progress. Please check back later.');
         setIsConfirmClearOpen(false);
         // try {
-        //     const response = await fetch(`http://localhost:7000/conversations/${currentChat.id}/messages`, {
+        //     const response = await fetch(`${API_URL}/conversations/${currentChat.id}/messages`, {
         //         method: 'DELETE',
         //         credentials: 'include',
         //     });
